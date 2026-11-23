@@ -1,6 +1,6 @@
 {
-  // Статичный сайт на Cloudflare Workers: отдаются файлы из папки public.
-  "name": "odio-site",
+  // Лаборатория (ветка funnel): отдельный Worker odio-lab на lab.o-dio.design. Основной сайт — Worker odio-site из main.
+  "name": "odio-lab",
   "compatibility_date": "2026-11-01",
   "assets": {
     "directory": "./public"
