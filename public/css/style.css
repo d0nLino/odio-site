@@ -1,72 +1,76 @@
-/* Размеры из макета 1920×1277. --u — один пиксель макета по ширине экрана. */
+/* Заглушка по макету Figma (узел 1425:3330), 1920×1277. --u — один пиксель макета по ширине экрана. */
 :root {
+  --orange: #ff4000;
   --white: #ffffff;
   --black: #000000;
-  --parme: #d6cfff;
-  --orange: #ff4000;
-  --bleu: #3aa0ff;
-  --font: "OT Neue Montreal", "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font: "Roboto Condensed", "Arial Narrow", sans-serif;
   --u: calc(100vw / 1920);
-  /* свечение масштабируется так, чтобы всегда закрывать экран */
-  --g: max(calc(100vw / 1920), calc(100vh / 1277));
   --small: max(11px, calc(var(--u) * 20));
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html, body { height: 100%; }
 
 body {
   margin: 0;
-  background: var(--white);
-  color: var(--black);
+  overflow: hidden;
+  background: var(--orange);
+  color: var(--white);
   font-family: var(--font);
   font-weight: 500;
   -webkit-font-smoothing: antialiased;
 }
 
 a { color: inherit; text-decoration: none; }
-a:hover { opacity: 0.6; }
-p, h1, ul { margin: 0; padding: 0; list-style: none; }
+a:hover { opacity: 0.7; }
+p, h1 { margin: 0; }
 
-/* Свечение: три размытых эллипса, привязаны к низу экрана */
-.glow {
-  position: fixed; left: 50%; bottom: 0;
-  width: calc(var(--g) * 1920); height: calc(var(--g) * 1277);
-  transform: translateX(-50%);
-  pointer-events: none; z-index: 0;
-}
-.glow i { position: absolute; display: block; border-radius: 50%; }
-.glow .e1 {
-  left: calc(var(--g) * 235); top: calc(var(--g) * 279);
-  width: calc(var(--g) * 1450); height: calc(var(--g) * 978);
-  background: radial-gradient(closest-side, #a9d3ff 0%, #c9e3ff 55%, rgba(220, 237, 255, 0) 100%);
-  filter: blur(calc(var(--g) * 40));
-}
-.glow .e2 {
-  left: calc(var(--g) * 467); top: calc(var(--g) * 667);
-  width: calc(var(--g) * 985); height: calc(var(--g) * 526);
-  background: radial-gradient(closest-side, #5db1ff 0%, #78bdff 60%, rgba(120, 189, 255, 0) 100%);
-  filter: blur(calc(var(--g) * 50));
-}
-.glow .e3 {
-  left: calc(var(--g) * 575); top: calc(var(--g) * 917);
-  width: calc(var(--g) * 770); height: calc(var(--g) * 340);
-  background: var(--bleu);
-  filter: blur(calc(var(--g) * 22));
-}
-
-#gl {
+/* Кремовый свет снизу */
+.light {
   position: fixed; inset: 0;
   width: 100%; height: 100%;
-  z-index: 1; pointer-events: none;
-  display: none;
+  object-fit: cover; object-position: 50% 100%;
+  pointer-events: none;
 }
-body.gl #gl { display: block; }
 
-/* Интерфейс по краям */
+/* Заголовок. Размытие нарастает к левому нижнему углу, как progressive blur в макете:
+   резкий слой и две размытые копии с масками по одному направлению (218°). */
+.hero {
+  position: fixed; left: 50%; top: 50%;
+  width: calc(var(--u) * 1407);
+  transform: translate(-50%, -50%);
+}
+.headline {
+  font-size: calc(var(--u) * 240);
+  font-weight: 500;
+  line-height: 0.85;
+  text-align: center;
+  text-transform: uppercase;
+  padding-top: 0.2em; margin-top: -0.2em;   /* чтобы маска не срезала ударение над Í */
+  -webkit-mask-image: linear-gradient(218deg, #000 64%, transparent 76%);
+  mask-image: linear-gradient(218deg, #000 64%, transparent 76%);
+}
+.headline-blur {
+  position: absolute; inset: -0.25em;   /* запас под размытие, чтобы не обрезалось по краю */
+  padding: 0.25em;
+  pointer-events: none;
+  user-select: none;
+}
+.b1 {
+  filter: blur(calc(var(--u) * 12));
+  -webkit-mask-image: linear-gradient(218deg, transparent 62%, #000 72%, #000 78%, transparent 88%);
+  mask-image: linear-gradient(218deg, transparent 62%, #000 72%, #000 78%, transparent 88%);
+}
+.b2 {
+  filter: blur(calc(var(--u) * 34));
+  -webkit-mask-image: linear-gradient(218deg, transparent 74%, #000 86%);
+  mask-image: linear-gradient(218deg, transparent 74%, #000 86%);
+}
+
+/* Подписи по краям */
 .ui {
-  position: fixed; inset: 0; z-index: 3;
+  position: fixed; inset: 0;
   pointer-events: none;
   font-size: var(--small);
   line-height: 1.3;
@@ -77,100 +81,15 @@ body.gl #gl { display: block; }
 .ui p { position: absolute; }
 .ui-left { left: 20px; top: 50%; transform: translateY(-50%); }
 .ui-right { right: 20px; top: 50%; transform: translateY(-50%); text-align: right; }
-.ui-bottom { right: 20px; bottom: 20px; text-align: right; }
-.ui-bottom span { margin-left: 0.6em; }
-
-/* Заголовок (статичная версия; при работающем WebGL рисуется в canvas) */
-.stage { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
-
-.hero {
-  position: absolute; left: 50%; top: 50%;
-  width: calc(var(--u) * 1407);
-  transform: translate(-50%, -50%);
-  text-align: center;
-}
-.hero h1 {
-  font-weight: 500;
-  font-size: calc(var(--u) * 240);
-  line-height: 0.85;
-  text-transform: uppercase;
-}
-.line { display: block; position: relative; }
-/* нижняя строка уходит в размытие, как в макете: резкая копия сверху, размытая снизу */
-.line-last { color: transparent; }
-.line-last::before,
-.line-last::after {
-  content: attr(data-text);
-  position: absolute; inset: 0;
-  color: var(--black);
-}
-.line-last::before {
-  -webkit-mask-image: linear-gradient(#000 40%, transparent 80%);
-  mask-image: linear-gradient(#000 40%, transparent 80%);
-}
-.line-last::after {
-  top: -0.1em; bottom: -0.3em;          /* запас, чтобы размытие не обрезалось по краю строки */
-  padding-top: 0.1em;
-  filter: blur(calc(var(--u) * 20));
-  -webkit-mask-image: linear-gradient(transparent 30%, #000 62%);
-  mask-image: linear-gradient(transparent 30%, #000 62%);
-}
-
-.labels { position: absolute; left: 50%; top: 0; }
-.label {
-  position: absolute;
-  height: calc(var(--u) * 32);
-  padding: 0 calc(var(--u) * 12);
-  display: flex; align-items: center;
-  font-size: calc(var(--u) * 20);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.l1 { left: calc(var(--u) * 231); top: calc(var(--u) * 132); background: var(--parme); color: var(--black); }
-.l2 { left: calc(var(--u) * 140); top: calc(var(--u) * 172); background: var(--orange); color: var(--white); }
-.l3 { left: calc(var(--u) * 241); top: calc(var(--u) * 212); background: var(--bleu); color: var(--white); }
-
-body.gl .hero { visibility: hidden; }
-
-/* Финальный экран после воронки */
-.outro {
-  position: absolute; left: 50%; top: 50%;
-  width: min(92vw, calc(var(--u) * 1100));
-  transform: translate(-50%, -50%);
-  text-align: center;
-  opacity: 0; visibility: hidden;
-  transition: opacity 0.5s, visibility 0.5s;
-}
-.outro p {
-  font-size: max(30px, calc(var(--u) * 72));
-  line-height: 0.95;
-  text-transform: uppercase;
-}
-.outro a {
-  display: inline-block; margin-top: 28px;
-  font-size: var(--small); letter-spacing: 0.1em; text-transform: uppercase;
-  border-bottom: 1px solid currentColor;
-  pointer-events: auto;
-}
-body.outro-on .outro { opacity: 1; visibility: visible; }
-
+.ui-copy { left: 20px; bottom: 20px; color: var(--black); }
+.ui-place { right: 20px; bottom: 20px; text-align: right; }
+.ui-place span { margin-left: 0.6em; }
 
 /* Телефон */
 @media (max-width: 767px) {
-  :root { --g: calc(100vw / 900); }
-  .hero { width: 94vw; top: 46%; }
-  .hero h1 { font-size: 17vw; }
-  .labels {
-    position: static; margin-top: 18px;
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-  }
-  .label { position: static; height: 24px; padding: 0 8px; font-size: 11px; }
-  .line-last::after { filter: blur(6px); }
-  .ui-left { top: 20px; transform: none; }
-  .ui-right { top: 20px; transform: none; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .outro { transition: none; }
+  .hero { width: 94vw; }
+  .headline { font-size: 14vw; }
+  .b1 { filter: blur(4px); }
+  .b2 { filter: blur(10px); }
+  .ui-left, .ui-right { top: 20px; transform: none; }
 }
