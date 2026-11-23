@@ -1,0 +1,8 @@
+{
+  // Статичный сайт на Cloudflare Workers: отдаются файлы из папки public.
+  "name": "odio-site",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./public"
+  }
+}
