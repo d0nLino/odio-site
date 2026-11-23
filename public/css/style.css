@@ -1,3 +1,12 @@
+/* Фирменный шрифт. Нужна веб-лицензия Pangram Pangram. */
+@font-face {
+  font-family: "OT Neue Montreal";
+  src: url("/fonts/OTNeueMontreal-MediumSqueezed.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Размеры из макета 1920×1277. --u — один пиксель макета по ширине экрана. */
 :root {
   --white: #ffffff;
@@ -5,7 +14,7 @@
   --parme: #d6cfff;
   --orange: #ff4000;
   --bleu: #3aa0ff;
-  --font: "OT Neue Montreal", "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font: "OT Neue Montreal", "Arial Narrow", sans-serif;
   --u: calc(100vw / 1920);
   /* свечение масштабируется так, чтобы всегда закрывать экран */
   --g: max(calc(100vw / 1920), calc(100vh / 1277));

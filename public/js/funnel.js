@@ -11,7 +11,7 @@ const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const canvas = document.getElementById("gl");
 const mouthEl = document.getElementById("mouth");
 
-const FONT = '"OT Neue Montreal", "Barlow Condensed", "Arial Narrow", sans-serif';
+const FONT = '"OT Neue Montreal", "Arial Narrow", sans-serif';
 const C = { parme: "#d6cfff", orange: "#ff4000", bleu: "#3aa0ff", black: "#000", white: "#fff" };
 
 // Карточки-заглушки 4:3. Потом заменим на картинки кейсов (1200×900 WebP) из R2.
