@@ -96,15 +96,24 @@ body.gl #gl { display: block; }
   text-transform: uppercase;
 }
 .line { display: block; position: relative; }
-/* нижняя строка уходит в размытие, как в макете */
-.line-last {
-  -webkit-mask-image: linear-gradient(#000 45%, transparent 92%);
-  mask-image: linear-gradient(#000 45%, transparent 92%);
-}
+/* нижняя строка уходит в размытие, как в макете: резкая копия сверху, размытая снизу */
+.line-last { color: transparent; }
+.line-last::before,
 .line-last::after {
   content: attr(data-text);
   position: absolute; inset: 0;
+  color: var(--black);
+}
+.line-last::before {
+  -webkit-mask-image: linear-gradient(#000 40%, transparent 80%);
+  mask-image: linear-gradient(#000 40%, transparent 80%);
+}
+.line-last::after {
+  top: -0.1em; bottom: -0.3em;          /* запас, чтобы размытие не обрезалось по краю строки */
+  padding-top: 0.1em;
   filter: blur(calc(var(--u) * 20));
+  -webkit-mask-image: linear-gradient(transparent 30%, #000 62%);
+  mask-image: linear-gradient(transparent 30%, #000 62%);
 }
 
 .labels { position: absolute; left: 50%; top: 0; }
@@ -146,8 +155,6 @@ body.gl .hero { visibility: hidden; }
 }
 body.outro-on .outro { opacity: 1; visibility: visible; }
 
-.spacer { height: 100vh; }
-body.gl .spacer { height: 600vh; }
 
 /* Телефон */
 @media (max-width: 767px) {
