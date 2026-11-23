@@ -87,19 +87,27 @@ async function start() {
       uniform vec4 uBlur;   // размытие низа последней строки: начало, полное, конец, радиус
       varying vec2 vUv;
 
+      // Приливное растяжение, как у чёрной дыры: ближняя к горлу часть притягивается
+      // сильнее дальней. Прямое отображение r -> s * r^k: вдоль радиуса объект
+      // растягивается в k раз сильнее, чем поперёк, и стягивается в нить к центру.
+      // Внутренние части вращаются быстрее внешних — нить закручивается в спираль.
       vec2 toSrc(vec2 p) {
         vec2 d = p - uC;
         float sq = uMouth.y / uMouth.x;
         d.y /= sq;
-        float R = length(uRes) * 0.5;
-        float r = length(d) / R;
-        float s = max(1.0 - uT * (0.75 + 0.25 * exp(-r * 2.5)), 0.0005);
-        float th = uT * uT * 5.0 * exp(-r * 1.6) + uT * 0.15;
+        float R = length(uRes) * 0.6;
+        float rd = length(d) / R;
+        float t = uT;
+        float k = 1.0 + 5.0 * t * t;                       // во сколько раз радиальное растяжение сильнее
+        float s = max(1.0 - 0.92 * pow(t, 1.3), 0.002);    // общее притяжение к центру
+        float rs = pow(max(rd / s, 1e-6), 1.0 / k);        // обратное отображение: где это было в тексте
+        float th = t * t * 1.6 / (0.12 + rs);              // дифференциальное вращение
+        vec2 dir = d / max(length(d), 1e-5);
         float c = cos(th), sn = sin(th);
-        d = mat2(c, -sn, sn, c) * d;
-        d /= s;
-        d.y *= sq;
-        return uC + d;
+        dir = mat2(c, -sn, sn, c) * dir;
+        vec2 o = dir * rs * R;
+        o.y *= sq;
+        return uC + o;
       }
       vec4 tap(vec2 s) {
         vec2 uv = s / uRes;
@@ -109,8 +117,8 @@ async function start() {
       void main() {
         vec2 p = vec2(vUv.x, 1.0 - vUv.y) * uRes;
         vec2 rel = p - uC;
-        vec2 tang = normalize(vec2(-rel.y, rel.x) + 1e-4);
-        float smear = uT * uT * 50.0;
+        vec2 radial = normalize(rel + 1e-4);
+        float smear = uT * uT * 70.0;                       // смаз вдоль линии падения
         vec2 base = toSrc(p);
         float b = uBlur.w * smoothstep(uBlur.x, uBlur.y, base.y) * (1.0 - step(uBlur.z, base.y)) + uT * 8.0;
         vec4 acc = vec4(0.0);
@@ -118,7 +126,7 @@ async function start() {
           float fi = float(i);
           float a = fi * 2.39996;
           vec2 disk = vec2(cos(a), sin(a)) * sqrt((fi + 0.5) / 16.0);
-          vec2 pi = p + tang * (fi / 15.0 - 0.5) * smear;
+          vec2 pi = p + radial * (fi / 15.0 - 0.5) * smear;
           acc += tap(toSrc(pi) + disk * b);
         }
         acc /= 16.0;
@@ -259,7 +267,7 @@ async function start() {
     return t;
   }
   const textures = WORKS.map(cardTexture);
-  const cardGeo = new THREE.PlaneGeometry(1, 0.75, 24, 1);   // 4:3
+  const cardGeo = new THREE.PlaneGeometry(1, 0.75, 32, 24);  // 4:3, плотная сетка — чтобы карточка гнулась при растяжении
   const cards = [];
   function makeCards(n) {
     cards.forEach((c) => { cardScene.remove(c.mesh); c.mesh.material.dispose(); });
@@ -270,16 +278,28 @@ async function start() {
         uniforms: {
           uTex: { value: textures[i % textures.length] },
           uBend: { value: 0 }, uOp: { value: 0 }, uFog: { value: 0 },
+          uStretch: { value: 0 }, uSize: { value: 1 }, uTarget: { value: new THREE.Vector3() },
           uDeep: { value: new THREE.Vector3(DEEP.r, DEEP.g, DEEP.b) },
         },
         vertexShader: /* glsl */ `
-          uniform float uBend;
+          uniform float uBend, uStretch, uSize;
+          uniform vec3 uTarget;     // точка притяжения — дно воронки
           varying vec2 vUv;
           void main() {
             vUv = uv;
             vec3 p = position;
             p.z -= uBend * p.x * p.x;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+            vec3 w = (modelMatrix * vec4(p, 1.0)).xyz;
+            vec3 c = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+            vec3 a = normalize(uTarget - c);
+            vec3 o = w - c;
+            float par = dot(o, a);                 // вдоль направления падения
+            vec3 perp = o - par * a;               // поперёк
+            // приливное растяжение: ближний к дыре край уходит вперёд сильнее дальнего
+            par = par * (1.0 + uStretch) + uStretch * 0.9 * par * abs(par) / uSize;
+            perp /= 1.0 + 0.6 * uStretch;          // карточка сужается, превращаясь в ленту
+            vec3 nw = c + a * (par + uStretch * uSize * 0.25) + perp;
+            gl_Position = projectionMatrix * viewMatrix * vec4(nw, 1.0);
           }
         `,
         fragmentShader: /* glsl */ `
@@ -365,11 +385,12 @@ async function start() {
       const mesh = c.mesh;
       if (q <= 0 || q >= 1) { mesh.visible = false; return; }
       mesh.visible = true;
-      let x, y, R, fog = 0, sc = 1;
+      let x, y, R, fog = 0, sc = 1, st = 0;
       if (q < CFG.rimShare) {                     // над воронкой: широкая спираль вниз к краю
         const s = q / CFG.rimShare;
         y = yTop * Math.pow(1 - s, 1.25);
         R = Rtop + (Rrim * 0.72 - Rtop) * Math.pow(s, 0.85);
+        st = 2.2 * Math.pow(s, 2.2);             // на подлёте к краю начинает тянуть
       } else {                                    // внутри: по стенке рупора в глубину
         const s = (q - CFG.rimShare) / (1 - CFG.rimShare);
         const v = Math.pow(s, 1.15) * 0.96;
@@ -377,6 +398,7 @@ async function start() {
         R = Rrim * 0.72 * PROFILE(v);
         fog = Math.min(1, Math.pow(v, 0.7) * 1.1) * open;
         sc = 1 - 0.5 * v;
+        st = 2.2 + 9.0 * Math.pow(s, 1.1);       // внутри — вытягивается в нить
       }
       const ang = c.a0 + Math.PI * 2 * CFG.turns * (0.75 * q + 0.25 * q * q * q);
       mesh.position.set(R * Math.sin(ang), y, R * Math.cos(ang));
@@ -387,6 +409,9 @@ async function start() {
       u.uBend.value = Math.min(1.5, s / (2 * Math.max(R, 0.05)));
       u.uOp.value = smooth(0, 0.05, q) * (1 - smooth(0.9, 1, q));
       u.uFog.value = fog;
+      u.uStretch.value = st * open;
+      u.uSize.value = s;
+      u.uTarget.value.set(0, -D * 1.05, 0);
     });
 
     document.body.classList.toggle("outro-on", p > 0.9);
