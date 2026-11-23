@@ -1,6 +1,6 @@
 {
-  // Лаборатория (ветка funnel): отдельный Worker odio-lab на lab.o-dio.design. Основной сайт — Worker odio-site из main.
-  "name": "odio-lab",
+  // Ветка funnel собирается как предпросмотр Worker odio-site: https://funnel-odio-site.dionis-7b9.workers.dev
+  "name": "odio-site",
   "compatibility_date": "2026-11-01",
   "assets": {
     "directory": "./public"
