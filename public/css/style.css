@@ -1,4 +1,6 @@
-/* Заглушка по макету Figma (узел 1425:3330), 1920×1277. --u — один пиксель макета по ширине экрана. */
+/* Заглушка по макету Figma (секция 1432:3503).
+   Компьютер — фрейм 1680×1012, --u = один пиксель макета по ширине экрана.
+   Телефон — фрейм 393×852, --u = 100vw / 393. */
 
 /* Фирменный шрифт. Нужна веб-лицензия Pangram Pangram. */
 @font-face {
@@ -8,13 +10,17 @@
   font-style: normal;
   font-display: swap;
 }
+
 :root {
-  --orange: #ff4000;
   --white: #ffffff;
   --black: #000000;
+  --parme: #d6cfff;
+  --bleu: #3aa0ff;
+  --orange: #ff4000;
   --font: "OT Neue Montreal", "Arial Narrow", sans-serif;
-  --u: calc(100vw / 1920);
-  --small: max(11px, calc(var(--u) * 20));
+  --u: calc(100vw / 1680);
+  --small: max(11px, calc(var(--u) * 16));
+  --pad: 20px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -24,58 +30,64 @@ html, body { height: 100%; }
 body {
   margin: 0;
   overflow: hidden;
-  background: var(--orange);
-  color: var(--white);
+  background: var(--white);
+  color: var(--black);
   font-family: var(--font);
   font-weight: 500;
   -webkit-font-smoothing: antialiased;
 }
 
 a { color: inherit; text-decoration: none; }
-a:hover { opacity: 0.7; }
-p, h1 { margin: 0; }
+a:hover { opacity: 0.6; }
+p, h1, ul { margin: 0; padding: 0; list-style: none; }
 
-/* Кремовый свет снизу */
-.light {
-  position: fixed; inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover; object-position: 50% 100%;
-  pointer-events: none;
+/* Синее свечение сверху: два размытых эллипса из макета */
+.glow { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.glow i {
+  position: absolute; display: block; border-radius: 50%;
+  background: var(--bleu);
+  transform: translate(-50%, -50%);
+}
+.g1 {
+  left: 50%; top: calc(var(--u) * -149);
+  width: calc(var(--u) * 2638); height: calc(var(--u) * 978);
+  opacity: 0.4;
+  filter: blur(calc(var(--u) * 150));
+}
+.g2 {
+  left: 50%; top: calc(var(--u) * -103);
+  width: calc(var(--u) * 1792); height: calc(var(--u) * 526);
+  filter: blur(calc(var(--u) * 95));
 }
 
-/* Заголовок. Размытие нарастает к левому нижнему углу, как progressive blur в макете:
-   резкий слой и две размытые копии с масками по одному направлению (218°). */
+/* Заголовок с плашками */
 .hero {
-  position: fixed; left: 50%; top: 50%;
-  width: calc(var(--u) * 1407);
+  position: fixed; left: calc(50% + var(--u) * 12.5); top: 50%;
+  width: calc(var(--u) * 1043);
   transform: translate(-50%, -50%);
 }
 .headline {
-  font-size: calc(var(--u) * 240);
+  font-size: calc(var(--u) * 200);
   font-weight: 500;
   line-height: 0.85;
+  letter-spacing: -0.02em;
   text-align: center;
   text-transform: uppercase;
-  padding-top: 0.2em; margin-top: -0.2em;   /* чтобы маска не срезала ударение над Í */
-  -webkit-mask-image: linear-gradient(218deg, #000 64%, transparent 76%);
-  mask-image: linear-gradient(218deg, #000 64%, transparent 76%);
 }
-.headline-blur {
-  position: absolute; inset: -0.25em;   /* запас под размытие, чтобы не обрезалось по краю */
-  padding: 0.25em;
-  pointer-events: none;
-  user-select: none;
+.labels { position: absolute; left: 50%; top: 0; }
+.label {
+  position: absolute;
+  height: calc(var(--u) * 24);
+  padding: 0 calc(var(--u) * 8);
+  display: flex; align-items: center;
+  font-size: calc(var(--u) * 16);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
-.b1 {
-  filter: blur(calc(var(--u) * 12));
-  -webkit-mask-image: linear-gradient(218deg, transparent 62%, #000 72%, #000 78%, transparent 88%);
-  mask-image: linear-gradient(218deg, transparent 62%, #000 72%, #000 78%, transparent 88%);
-}
-.b2 {
-  filter: blur(calc(var(--u) * 34));
-  -webkit-mask-image: linear-gradient(218deg, transparent 74%, #000 86%);
-  mask-image: linear-gradient(218deg, transparent 74%, #000 86%);
-}
+.l1 { left: calc(var(--u) * 259.5); top: calc(var(--u) * 145); background: var(--parme); color: var(--black); }
+.l2 { left: calc(var(--u) * 168.5); top: calc(var(--u) * 177); background: var(--bleu); color: var(--white); }
+.l3 { left: calc(var(--u) * 269.5); top: calc(var(--u) * 209); background: var(--orange); color: var(--white); }
 
 /* Подписи по краям */
 .ui {
@@ -88,17 +100,40 @@ p, h1 { margin: 0; }
 }
 .ui a { pointer-events: auto; }
 .ui p { position: absolute; }
-.ui-left { left: 20px; top: 50%; transform: translateY(-50%); }
-.ui-right { right: 20px; top: 50%; transform: translateY(-50%); text-align: right; }
-.ui-copy { left: 20px; bottom: 20px; color: var(--black); }
-.ui-place { right: 20px; bottom: 20px; text-align: right; }
-.ui-place span { margin-left: 0.6em; }
+.ui span, .ui a { display: block; }
+.ui-name { left: var(--pad); top: 50%; transform: translateY(-50%); }
+.ui-contacts { right: var(--pad); top: 50%; transform: translateY(-50%); text-align: right; }
+.ui-name span + span, .ui-contacts a + a { margin-top: 0.45em; }
+.ui-copy { left: var(--pad); bottom: var(--pad); }
+.ui-place { right: var(--pad); bottom: var(--pad); text-align: right; }
+.ui-place span { display: inline; margin-left: 0.6em; }
 
-/* Телефон */
+/* Телефон: свой макет 393×852 */
 @media (max-width: 767px) {
-  .hero { width: 94vw; }
-  .headline { font-size: 17vw; }
-  .b1 { filter: blur(4px); }
-  .b2 { filter: blur(10px); }
-  .ui-left, .ui-right { top: 20px; transform: none; }
+  :root { --u: calc(100vw / 393); --pad: 16px; }
+
+  .g1 { top: calc(var(--u) * -149); width: calc(var(--u) * 1402); height: calc(var(--u) * 978); }
+  .g2 { top: calc(var(--u) * -48); width: calc(var(--u) * 1022); height: calc(var(--u) * 526); }
+
+  .hero { left: 50%; top: 48%; width: 100vw; }
+  .headline { font-size: calc(var(--u) * 90); }
+  .labels { left: 0; }
+  .label { height: calc(var(--u) * 20); padding: 0 calc(var(--u) * 6); font-size: calc(var(--u) * 14); }
+  .l1 { left: calc(var(--u) * 87); top: calc(var(--u) * 122); }
+  .l2 { left: calc(var(--u) * 16); top: calc(var(--u) * 150); }
+  .l3 { left: calc(var(--u) * 97); top: calc(var(--u) * 178); }
+
+  .ui { font-size: 14px; }
+  .ui-name {
+    top: var(--pad); left: var(--pad); right: var(--pad); transform: none;
+    display: flex; justify-content: space-between;
+  }
+  .ui-name span + span { margin-top: 0; }
+  .ui-contacts {
+    top: auto; bottom: 164px; left: 0; right: 0; transform: none;
+    text-align: center; font-size: 16px;
+  }
+  .ui-contacts a + a { margin-top: 0.45em; }
+  .ui-place { right: 0; left: 0; bottom: calc(var(--pad) + 22px); text-align: center; }
+  .ui-copy { left: 0; right: 0; bottom: var(--pad); text-align: center; }
 }
