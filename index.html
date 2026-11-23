@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>o'dío design studio — The design partner for leaders</title>
+  <meta name="description" content="Branding, digital products and websites for funded startups, premium interiors and real estate developers. EU, US, UAE.">
+  <meta property="og:title" content="o'dío design studio">
+  <meta property="og:description" content="The design partner for leaders. Branding, digital products and websites.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://o-dio.design/">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="/">o'dío</a>
+    <a class="header-link" href="#contact">Contact</a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>The design partner for leaders.</h1>
+      <p class="lead">Branding, digital products and websites for funded startups, premium interiors and real estate developers.</p>
+      <p class="markets">EU · US · UAE</p>
+    </section>
+
+    <section class="work" aria-labelledby="work-title">
+      <h2 id="work-title" class="section-label">Selected work</h2>
+      <ul class="cases" id="cases"></ul>
+    </section>
+
+    <section class="contact" id="contact" aria-labelledby="contact-title">
+      <h2 id="contact-title" class="section-label">Contact</h2>
+      <p class="audit">Send us a link to your site. We'll reply with three things we'd change first, within 2 business days.</p>
+      <ul class="contact-links">
+        <li><a href="mailto:say@o-dio.design">say@o-dio.design</a></li>
+        <li><a href="https://t.me/o_dio_design" target="_blank" rel="noopener">Telegram</a></li>
+        <!-- TODO: ссылка на LinkedIn основателя -->
+        <li><a href="#" target="_blank" rel="noopener">LinkedIn</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>o'dío design studio, Moldova</span>
+    <span>© <span id="year">2026</span></span>
+  </footer>
+
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
+    <div class="modal-inner">
+      <button class="modal-close" id="modal-close" aria-label="Close">Close</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <script src="/js/cases.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>
