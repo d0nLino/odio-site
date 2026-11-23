@@ -4,60 +4,68 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>o'dío design studio — The design partner for leaders</title>
-  <meta name="description" content="Branding, digital products and websites for funded startups, premium interiors and real estate developers. EU, US, UAE.">
+  <meta name="description" content="o'dío is a design studio from Moldova: branding & communication, digital products and web design. Working with clients in the EU, US and UAE.">
   <meta property="og:title" content="o'dío design studio">
-  <meta property="og:description" content="The design partner for leaders. Branding, digital products and websites.">
+  <meta property="og:description" content="The design partner for leaders. Branding & communication, digital products, web design.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://o-dio.design/">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Временный шрифт. Заменить на OT Neue Montreal Medium Squeezed, когда будут файлы и лицензия. -->
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js" } }
+  </script>
 </head>
 <body>
-  <header class="header">
-    <a class="logo" href="/">o'dío</a>
-    <a class="header-link" href="#contact">Contact</a>
-  </header>
+  <div class="glow" aria-hidden="true">
+    <i class="e1"></i><i class="e2"></i><i class="e3" id="mouth"></i>
+  </div>
 
-  <main>
-    <section class="hero">
-      <h1>The design partner for leaders.</h1>
-      <p class="lead">Branding, digital products and websites for funded startups, premium interiors and real estate developers.</p>
-      <p class="markets">EU · US · UAE</p>
-    </section>
+  <canvas id="gl" aria-hidden="true"></canvas>
 
-    <section class="work" aria-labelledby="work-title">
-      <h2 id="work-title" class="section-label">Selected work</h2>
-      <ul class="cases" id="cases"></ul>
-    </section>
+  <div class="ui">
+    <p class="ui-left">o'dío<br>design studio</p>
+    <p class="ui-right">
+      <a href="mailto:say@o-dio.design">say@o-dio.design</a><br>
+      <a href="https://t.me/o_dio_design" target="_blank" rel="noopener">Telegram</a>
+    </p>
+    <p class="ui-bottom">Moldova, Chisinau <span id="clock"></span></p>
+  </div>
 
-    <section class="contact" id="contact" aria-labelledby="contact-title">
-      <h2 id="contact-title" class="section-label">Contact</h2>
-      <p class="audit">Send us a link to your site. We'll reply with three things we'd change first, within 2 business days.</p>
-      <ul class="contact-links">
-        <li><a href="mailto:say@o-dio.design">say@o-dio.design</a></li>
-        <li><a href="https://t.me/o_dio_design" target="_blank" rel="noopener">Telegram</a></li>
-        <!-- TODO: ссылка на LinkedIn основателя -->
-        <li><a href="#" target="_blank" rel="noopener">LinkedIn</a></li>
+  <main class="stage">
+    <div class="hero" id="hero">
+      <h1>
+        <span class="line">O'Dío:</span>
+        <span class="line">The design</span>
+        <span class="line">partner for</span>
+        <span class="line line-last" data-text="leaders">leaders</span>
+      </h1>
+      <ul class="labels">
+        <li class="label l1">Branding &amp; communication</li>
+        <li class="label l2">Digital products</li>
+        <li class="label l3">Web design</li>
       </ul>
+    </div>
+
+    <section class="outro" id="outro" aria-label="Contact">
+      <p>Send us a link to your site. We'll reply with three things we'd change first, within 2&nbsp;business days.</p>
+      <a href="mailto:say@o-dio.design">say@o-dio.design</a>
     </section>
   </main>
 
-  <footer class="footer">
-    <span>o'dío design studio, Moldova</span>
-    <span>© <span id="year">2026</span></span>
-  </footer>
+  <div class="spacer" id="spacer" aria-hidden="true"></div>
 
-  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
-    <div class="modal-inner">
-      <button class="modal-close" id="modal-close" aria-label="Close">Close</button>
-      <div id="modal-content"></div>
-    </div>
-  </div>
-
-  <script src="/js/cases.js"></script>
-  <script src="/js/main.js"></script>
+  <script>
+    (function () {
+      var el = document.getElementById("clock");
+      var fmt = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Chisinau", hour: "numeric", minute: "2-digit" });
+      function tick() { el.textContent = fmt.format(new Date()); }
+      tick(); setInterval(tick, 15000);
+    })();
+  </script>
+  <script type="module" src="/js/funnel.js"></script>
 </body>
 </html>
