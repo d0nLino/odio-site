@@ -1,9 +1,18 @@
 /* Заглушка по макету Figma (узел 1425:3330), 1920×1277. --u — один пиксель макета по ширине экрана. */
+
+/* Фирменный шрифт. Нужна веб-лицензия Pangram Pangram. */
+@font-face {
+  font-family: "OT Neue Montreal";
+  src: url("/fonts/OTNeueMontreal-MediumSqueezed.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
 :root {
   --orange: #ff4000;
   --white: #ffffff;
   --black: #000000;
-  --font: "Roboto Condensed", "Arial Narrow", sans-serif;
+  --font: "OT Neue Montreal", "Arial Narrow", sans-serif;
   --u: calc(100vw / 1920);
   --small: max(11px, calc(var(--u) * 20));
 }
@@ -88,7 +97,7 @@ p, h1 { margin: 0; }
 /* Телефон */
 @media (max-width: 767px) {
   .hero { width: 94vw; }
-  .headline { font-size: 14vw; }
+  .headline { font-size: 17vw; }
   .b1 { filter: blur(4px); }
   .b2 { filter: blur(10px); }
   .ui-left, .ui-right { top: 20px; transform: none; }
