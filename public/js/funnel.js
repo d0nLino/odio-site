@@ -217,7 +217,7 @@ async function start() {
         float v = vUv.y;                                  // 0 — край, 1 — дно
         vec3 bleu = vec3(0.227, 0.627, 1.0);
         vec3 deep = vec3(0.016, 0.07, 0.18);
-        float k = pow(v, 0.3) * uOpen;
+        float k = pow(v, 0.22) * uOpen;                      // темнеет быстрее — дно уходит в черноту
         vec3 col = mix(bleu, deep, k);
         // сетка: меридианы и кольца, кольца бегут вниз
         float fu = fract(vUv.x * 36.0);
