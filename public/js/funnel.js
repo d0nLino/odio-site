@@ -30,13 +30,15 @@ const CFG = {
   fov: 30,
   depth: 2.6,          // глубина воронки в радиусах горла
   openEnd: 0.14,       // к этой доле прокрутки воронка раскрыта полностью
-  textEnd: 0.34,       // к этой доле текст полностью провалился
+  textEnd: 0.4,        // к этой доле текст свернулся и провалился
   cardStart: 0.08,     // когда появляется первая карточка
   cardDur: 0.26,       // сколько прокрутки занимает путь одной карточки
   rimShare: 0.6,       // доля пути над воронкой, остальное — внутри
   turns: 1.4,          // оборотов спирали за путь
   cardPx: 230,         // ширина карточки на экране у края воронки, px (компьютер)
   // Живость от скорости прокрутки: пружина догоняет скорость, перелетает и затухает.
+  flowBase: 0.5,       // скорость вращения воронки в покое
+  flowScroll: 14,      // насколько прокрутка разгоняет вращение
   velGain: 2.2,        // как сильно скорость прокрутки гнёт карточки и линзу
   stiff: 160,          // жёсткость пружины (выше — быстрее колебания)
   damp: 11,            // затухание (ниже — дольше пружинит)
@@ -78,6 +80,8 @@ async function start() {
       uT: { value: 0 },
       uOpen: { value: 0 },
       uBlur: { value: new THREE.Vector4(0, 1, 2, 0) },
+      uBox: { value: new THREE.Vector2(0, 1) },
+      uLH: { value: 100 },
     },
     vertexShader: /* glsl */ `
       varying vec2 vUv;
@@ -92,57 +96,76 @@ async function start() {
       uniform float uT;     // 0 — текст на месте, 1 — провалился
       uniform float uOpen;  // насколько раскрыта воронка
       uniform vec4 uBlur;   // размытие низа последней строки: начало, полное, конец, радиус
+      uniform vec2 uBox;    // верх и низ блока текста с плашками, пиксели
+      uniform float uLH;    // высота строки, пиксели
       varying vec2 vUv;
 
-      // Приливное растяжение, как у чёрной дыры: ближняя к горлу часть притягивается
-      // сильнее дальней. Прямое отображение r -> s * r^k: вдоль радиуса объект
-      // растягивается в k раз сильнее, чем поперёк, и стягивается в нить к центру.
-      // Внутренние части вращаются быстрее внешних — нить закручивается в спираль.
-      vec2 toSrc(vec2 p) {
-        vec2 d = p - uC;
-        float sq = uMouth.y / uMouth.x;
-        d.y /= sq;
-        float R = length(uRes) * 0.6;
-        float rd = length(d) / R;
-        float t = uT;
-        float k = 1.0 + 5.0 * t * t;                       // во сколько раз радиальное растяжение сильнее
-        float s = max(1.0 - 0.92 * pow(t, 1.3), 0.002);    // общее притяжение к центру
-        float rs = pow(max(rd / s, 1e-6), 1.0 / k);        // обратное отображение: где это было в тексте
-        float th = t * t * 1.6 / (0.12 + rs);              // дифференциальное вращение
-        vec2 dir = d / max(length(d), 1e-5);
-        float c = cos(th), sn = sin(th);
-        dir = mat2(c, -sn, sn, c) * dir;
-        vec2 o = dir * rs * R;
-        o.y *= sq;
-        return uC + o;
-      }
       vec4 tap(vec2 s) {
         vec2 uv = s / uRes;
         if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return vec4(0.0);
         return texture2D(uTex, vec2(uv.x, 1.0 - uv.y));
       }
+
+      // Текст сворачивается в рулон сверху вниз: лист закатывается назад на цилиндр радиуса rho,
+      // ось которого ползёт от верха блока к низу.
+      // Потом готовая трубка сужается и уходит вниз, в горло.
       void main() {
         vec2 p = vec2(vUv.x, 1.0 - vUv.y) * uRes;
-        vec2 rel = p - uC;
-        vec2 radial = normalize(rel + 1e-4);
-        float smear = uT * uT * 70.0;                       // смаз вдоль линии падения
-        vec2 base = toSrc(p);
-        float b = uBlur.w * smoothstep(uBlur.x, uBlur.y, base.y) * (1.0 - step(uBlur.z, base.y)) + uT * 8.0;
-        vec4 acc = vec4(0.0);
-        for (int i = 0; i < 16; i++) {
-          float fi = float(i);
-          float a = fi * 2.39996;
-          vec2 disk = vec2(cos(a), sin(a)) * sqrt((fi + 0.5) / 16.0);
-          vec2 pi = p + radial * (fi / 15.0 - 0.5) * smear;
-          acc += tap(toSrc(pi) + disk * b);
+        float t = uT;
+        float roll = smoothstep(0.0, 0.68, t);
+        float sink = smoothstep(0.55, 1.0, t);
+
+        // всасывание трубки: опускается к горлу и сужается по ширине
+        float tubeY = uBox.y;
+        vec2 q = p;
+        q.y -= sink * sink * (uC.y - tubeY);
+        float sx = max(1.0 - 0.94 * sink, 0.02);
+        q.x = uC.x + (q.x - uC.x) / sx;
+
+        float rho = uLH * (0.34 - 0.2 * sink);
+        float yA = mix(uBox.x, uBox.y, roll);            // ось рулона
+        float total = (yA - uBox.x) / rho;               // сколько листа уже намотано, в радианах
+        float shade = 1.0;
+        float srcY = q.y;
+        bool vis = true;
+
+        if (roll > 0.001) {
+          if (q.y < yA - rho) {
+            vis = false;                                 // выше рулона пусто — всё намотано
+          } else if (q.y < yA) {
+            // лист закатывается назад, от зрителя: видна верхняя четверть внешнего витка,
+            // текст на ней читается и сжимается по изгибу
+            float a = asin(clamp((yA - q.y) / rho, 0.0, 1.0));
+            if (a <= total) {
+              srcY = yA - rho * a;
+              shade = 0.45 + 0.55 * cos(a);              // темнеет, уходя за изгиб
+            } else {
+              vis = false;
+            }
+          }
         }
-        acc /= 16.0;
-        // внутри горла текст проваливается: гаснет и синеет, когда воронка раскрыта
+
+        vec4 acc = vec4(0.0);
+        if (vis) {
+          vec2 src = vec2(q.x, srcY);
+          float b = uBlur.w * smoothstep(uBlur.x, uBlur.y, src.y) * (1.0 - step(uBlur.z, src.y)) + sink * 6.0;
+          for (int i = 0; i < 12; i++) {
+            float fi = float(i);
+            float ang = fi * 2.39996;
+            vec2 disk = vec2(cos(ang), sin(ang)) * sqrt((fi + 0.5) / 12.0);
+            acc += tap(src + disk * b);
+          }
+          acc /= 12.0;
+          acc.rgb *= shade;
+        }
+
+        // внутри горла трубка гаснет и синеет — уходит в глубину
+        vec2 rel = p - uC;
         float e = length(rel / uMouth);
-        float inside = (1.0 - smoothstep(0.75, 1.02, e)) * uOpen * smoothstep(0.02, 0.4, uT);
-        acc.rgb = mix(acc.rgb, vec3(0.02, 0.09, 0.23) * acc.a, inside * 0.6);
-        acc *= 1.0 - inside * (0.35 + 0.65 * smoothstep(1.0, 0.2, e));
-        acc *= 1.0 - smoothstep(0.85, 1.0, uT);
+        float inside = (1.0 - smoothstep(0.7, 1.0, e)) * uOpen * sink;
+        acc.rgb = mix(acc.rgb, vec3(0.02, 0.09, 0.23) * acc.a, inside * 0.7);
+        acc *= 1.0 - inside * smoothstep(1.0, 0.25, e);
+        acc *= 1.0 - smoothstep(0.9, 1.0, t);
         gl_FragColor = acc;
       }
     `,
@@ -191,6 +214,9 @@ async function start() {
 
     const lastTop = top + 3 * lh;
     textMat.uniforms.uBlur.value.set(lastTop + lh * 0.45, lastTop + lh * 0.95, lastTop + lh * 1.15, mobile ? 6 : 20 * u);
+    const boxBottom = mobile ? top + blockH + 18 + 3 * (lhgt + 6) : top + blockH;
+    textMat.uniforms.uBox.value.set(top - fs * 0.2, boxBottom);
+    textMat.uniforms.uLH.value = lh;
   }
 
   // ================= 3D: воронка и карточки =================
@@ -219,14 +245,14 @@ async function start() {
   for (let i = 0; i <= 48; i++) { const v = i / 48; pts.push(new THREE.Vector2(PROFILE(v), -v)); }
   const funnelMat = new THREE.ShaderMaterial({
     transparent: true, side: THREE.DoubleSide, depthWrite: true,
-    uniforms: { uOpen: { value: 0 }, uTime: { value: 0 } },
+    uniforms: { uOpen: { value: 0 }, uFlow: { value: 0 } },
     vertexShader: /* glsl */ `
       varying vec2 vUv;
       void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
     `,
     fragmentShader: /* glsl */ `
       uniform float uOpen;
-      uniform float uTime;
+      uniform float uFlow;   // фаза вращения и стока: растёт сама, на прокрутке быстрее
       varying vec2 vUv;
       void main() {
         float v = vUv.y;                                  // 0 — край, 1 — дно
@@ -234,13 +260,10 @@ async function start() {
         vec3 deep = vec3(0.016, 0.07, 0.18);
         float k = pow(v, 0.22) * uOpen;                      // темнеет быстрее — дно уходит в черноту
         vec3 col = mix(bleu, deep, k);
-        // сетка: меридианы и кольца, кольца бегут вниз
-        float fu = fract(vUv.x * 36.0);
-        float mer = 1.0 - smoothstep(0.0, 0.05 + v * 0.2, min(fu, 1.0 - fu));
-        float fr = fract(log(1.0 + 6.0 * v) * 3.2 - uTime);
-        float ring = 1.0 - smoothstep(0.0, 0.06, min(fr, 1.0 - fr));
-        float grid = max(mer, ring) * uOpen * (1.0 - v) * 0.22;
-        col += grid;
+        // мягкие спиральные рукава: вращаются и стекают вниз (сетки нет)
+        float arms = sin(6.28318 * vUv.x * 5.0 + log(1.0 + 6.0 * v) * 7.0 - uFlow);
+        float arms2 = sin(6.28318 * vUv.x * 3.0 - log(1.0 + 6.0 * v) * 4.0 - uFlow * 0.6 + 1.7);
+        col *= 1.0 + (0.10 * arms + 0.05 * arms2) * uOpen * (1.0 - v * 0.6);
         float a = smoothstep(0.0, 0.035, v) * 0.97 + 0.03;   // мягкий край — его рисует CSS-свечение
         gl_FragColor = vec4(col * a, a);
       }
@@ -340,6 +363,33 @@ async function start() {
     }
   }
 
+  // ================= Свечение вокруг горла =================
+  // Чем шире раскрыта воронка, тем шире синее свечение; ярче у края, плавно до нуля.
+  const glowMat = new THREE.ShaderMaterial({
+    transparent: true, depthTest: false, depthWrite: false, premultipliedAlpha: true,
+    uniforms: { uRes: { value: new THREE.Vector2(1, 1) }, uC: { value: new THREE.Vector2() }, uMouth: { value: new THREE.Vector2(100, 44) }, uOpen: { value: 0 } },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
+    `,
+    fragmentShader: /* glsl */ `
+      precision highp float;
+      uniform vec2 uRes, uC, uMouth;
+      uniform float uOpen;
+      varying vec2 vUv;
+      void main() {
+        vec2 p = vec2(vUv.x, 1.0 - vUv.y) * uRes;
+        float e = length((p - uC) / uMouth);            // 1 — край горла
+        float sig = 0.25 + 0.75 * uOpen;                  // ширина свечения растёт с раскрытием
+        float x = max(e - 0.85, 0.0) / sig;
+        float a = uOpen * 0.7 * exp(-x * x * 2.2);
+        gl_FragColor = vec4(vec3(0.227, 0.627, 1.0) * a, a);
+      }
+    `,
+  });
+  const glowScene = new THREE.Scene();
+  glowScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), glowMat));
+
   // ================= Пост-проход: линза =================
   // Весь кадр рисуется в текстуру, затем проходит через «линзу»: втягивание к горлу,
   // смаз вдоль линии падения и цветное расслоение, сила которых зависит от скорости прокрутки.
@@ -365,8 +415,7 @@ async function start() {
       uniform float uWob, uOpen, uLens, uLensVel, uRgb;
       varying vec2 vUv;
       vec4 at(vec2 p) {
-        vec2 uv = p / uRes;
-        if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return vec4(0.0);
+        vec2 uv = clamp(p / uRes, vec2(0.0005), vec2(0.9995));   // за краем — крайний пиксель, без белой каймы
         return texture2D(tScene, vec2(uv.x, 1.0 - uv.y));
       }
       void main() {
@@ -416,6 +465,9 @@ async function start() {
     textMat.uniforms.uC.value.copy(mouth);
     textMat.uniforms.uMouth.value.set(r.width / 2, r.height / 2);
     postMat.uniforms.uRes.value.set(W, H);
+    glowMat.uniforms.uRes.value.set(W, H);
+    glowMat.uniforms.uC.value.copy(mouth);
+    glowMat.uniforms.uMouth.value.set(r.width / 2, r.height / 2);
     postMat.uniforms.uC.value.copy(mouth);
     postMat.uniforms.uMouth.value.set(r.width / 2, r.height / 2);
 
@@ -442,6 +494,7 @@ async function start() {
   const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   let target = 0, prog = 0, dirty = true;
   let prevProg = 0, wob = 0, wobV = 0, clock = 0;   // пружина от скорости прокрутки
+  let flow = 0;                                      // фаза вращения воронки
   function readScroll() {
     const max = document.documentElement.scrollHeight - window.innerHeight;
     target = max > 0 ? window.scrollY / max : 0;
@@ -454,7 +507,8 @@ async function start() {
     cap.position.y = -D;
     cap.visible = open > 0.01;
     funnelMat.uniforms.uOpen.value = open;
-    funnelMat.uniforms.uTime.value = p * 6;
+    funnelMat.uniforms.uFlow.value = flow;
+    glowMat.uniforms.uOpen.value = open;
     textMat.uniforms.uOpen.value = open;
     textMat.uniforms.uT.value = smooth(0, CFG.textEnd, p);
 
@@ -517,12 +571,13 @@ async function start() {
       wobV += ((goal - wob) * CFG.stiff - wobV * CFG.damp) * h;
       wob += wobV * h;
     }
-    const moving = Math.abs(d) > 0.00005 || Math.abs(wob) > 0.0005 || Math.abs(wobV) > 0.002;
-    if (moving || dirty) {
+    flow += dt * (CFG.flowBase + Math.abs(vel) * CFG.flowScroll);
+    {                                            // воронка вращается всегда — рисуем каждый кадр
       clock += dt;
       update(prog);
       renderer.setRenderTarget(rt);
       renderer.clear();
+      renderer.render(glowScene, orthoCam);      // свечение вокруг горла
       renderer.render(funnelScene, cam);         // яма
       renderer.render(textScene, orthoCam);      // текст поверх, проваливается в горло
       renderer.render(cardScene, cam);           // карточки; пол с дыркой прячет то, что ниже края
