@@ -36,6 +36,13 @@ const CFG = {
   rimShare: 0.6,       // доля пути над воронкой, остальное — внутри
   turns: 1.4,          // оборотов спирали за путь
   cardPx: 230,         // ширина карточки на экране у края воронки, px (компьютер)
+  // Живость от скорости прокрутки: пружина догоняет скорость, перелетает и затухает.
+  velGain: 2.2,        // как сильно скорость прокрутки гнёт карточки и линзу
+  stiff: 160,          // жёсткость пружины (выше — быстрее колебания)
+  damp: 11,            // затухание (ниже — дольше пружинит)
+  lens: 0.12,          // постоянное втягивание кадра к горлу, когда воронка раскрыта
+  lensVel: 0.55,       // добавка втягивания от скорости
+  rgbVel: 9,           // цветное расслоение от скорости, px
 };
 
 function webglOK() {
@@ -262,7 +269,6 @@ async function start() {
     if ("letterSpacing" in x) x.letterSpacing = "3.2px";
     x.fillText(w.sub.toUpperCase(), 46, 540);
     const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;
     return t;
   }
@@ -279,16 +285,24 @@ async function start() {
           uTex: { value: textures[i % textures.length] },
           uBend: { value: 0 }, uOp: { value: 0 }, uFog: { value: 0 },
           uStretch: { value: 0 }, uSize: { value: 1 }, uTarget: { value: new THREE.Vector3() },
+          uWob: { value: 0 }, uPhase: { value: i * 1.7 }, uTime: { value: 0 },
           uDeep: { value: new THREE.Vector3(DEEP.r, DEEP.g, DEEP.b) },
         },
         vertexShader: /* glsl */ `
           uniform float uBend, uStretch, uSize;
           uniform vec3 uTarget;     // точка притяжения — дно воронки
+          uniform float uWob, uPhase, uTime;
           varying vec2 vUv;
           void main() {
             vUv = uv;
             vec3 p = position;
             p.z -= uBend * p.x * p.x;
+            // мягкий материал: на скорости карточка выгибается и колышется, как ткань
+            float wb = uWob;
+            p.z += wb * (0.32 * sin(uv.x * 3.14159) * sin(uv.y * 3.14159)
+                       + 0.12 * sin(uv.x * 6.0 + uPhase + uTime * 2.0) * uv.y);
+            p.y += wb * 0.10 * sin(uv.x * 3.14159);               // середина отстаёт от краёв
+            p.x *= 1.0 - abs(wb) * 0.06;
             vec3 w = (modelMatrix * vec4(p, 1.0)).xyz;
             vec3 c = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
             vec3 a = normalize(uTarget - c);
@@ -308,11 +322,14 @@ async function start() {
           uniform vec3 uDeep;
           varying vec2 vUv;
           void main() {
+            // скруглённые углы (радиус ~4% ширины)
+            vec2 q = abs(vUv - 0.5) - vec2(0.5 - 0.04, 0.5 - 0.0533);
+            float sd = length(max(q, 0.0)) - 0.04;
+            float corner = 1.0 - smoothstep(-0.004, 0.0, sd);
             vec4 c = texture2D(uTex, gl_FrontFacing ? vUv : vec2(1.0 - vUv.x, vUv.y));
             if (!gl_FrontFacing) c.rgb *= 0.55;
-            gl_FragColor = vec4(c.rgb, c.a * uOp);
-            #include <colorspace_fragment>
-            gl_FragColor.rgb = mix(gl_FragColor.rgb, uDeep, uFog);   // в глубине тонет в темноте
+            c.rgb = mix(c.rgb, uDeep, uFog);                     // в глубине тонет в темноте
+            gl_FragColor = vec4(c.rgb, c.a * uOp * corner);
           }
         `,
       });
@@ -322,6 +339,64 @@ async function start() {
       cards.push({ mesh, a0: (i * 2.39996) % (Math.PI * 2) });
     }
   }
+
+  // ================= Пост-проход: линза =================
+  // Весь кадр рисуется в текстуру, затем проходит через «линзу»: втягивание к горлу,
+  // смаз вдоль линии падения и цветное расслоение, сила которых зависит от скорости прокрутки.
+  const rt = new THREE.WebGLRenderTarget(1, 1, { samples: 4 });
+  const postMat = new THREE.ShaderMaterial({
+    transparent: true, depthTest: false, depthWrite: false, premultipliedAlpha: true,
+    uniforms: {
+      tScene: { value: rt.texture },
+      uRes: { value: new THREE.Vector2(1, 1) },
+      uC: { value: new THREE.Vector2() },
+      uMouth: { value: new THREE.Vector2(100, 44) },
+      uWob: { value: 0 }, uOpen: { value: 0 },
+      uLens: { value: CFG.lens }, uLensVel: { value: CFG.lensVel }, uRgb: { value: CFG.rgbVel },
+    },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
+    `,
+    fragmentShader: /* glsl */ `
+      precision highp float;
+      uniform sampler2D tScene;
+      uniform vec2 uRes, uC, uMouth;
+      uniform float uWob, uOpen, uLens, uLensVel, uRgb;
+      varying vec2 vUv;
+      vec4 at(vec2 p) {
+        vec2 uv = p / uRes;
+        if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return vec4(0.0);
+        return texture2D(tScene, vec2(uv.x, 1.0 - uv.y));
+      }
+      void main() {
+        vec2 p = vec2(vUv.x, 1.0 - vUv.y) * uRes;
+        vec2 d = p - uC;
+        vec2 e = d / uMouth;                         // в радиусах горла, с учётом наклона
+        float r = length(e);
+        float v = uWob;
+        // втягивание: чем ближе к горлу, тем сильнее; на скорости — сильнее и с перелётом
+        float pull = (uLens * uOpen + uLensVel * v) * exp(-r * 0.35);
+        vec2 dir = d / max(length(d), 1.0);
+        float shift = pull * length(d);
+        // смаз вдоль линии падения и цветное расслоение
+        float smear = abs(v) * 40.0 * (0.3 + 0.7 * smoothstep(0.0, 3.0, r));
+        float rgb = uRgb * abs(v) * smoothstep(0.5, 4.0, r);
+        vec4 acc = vec4(0.0);
+        for (int i = 0; i < 6; i++) {
+          float f = float(i) / 5.0 - 0.5;
+          vec2 q = p + dir * (shift + f * smear);
+          vec4 cg = at(q);
+          float rr = at(q + dir * rgb).r;
+          float bb = at(q - dir * rgb).b;
+          acc += vec4(rr, cg.g, bb, cg.a);
+        }
+        gl_FragColor = acc / 6.0;
+      }
+    `,
+  });
+  const postScene = new THREE.Scene();
+  postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMat));
 
   // ================= Раскладка =================
   const mouth = new THREE.Vector2();
@@ -333,12 +408,16 @@ async function start() {
     mobile = W < 768;
     renderer.setPixelRatio(DPR);
     renderer.setSize(W, H, false);
+    rt.setSize(Math.round(W * DPR), Math.round(H * DPR));
 
     const r = mouthEl.getBoundingClientRect();
     mouth.set(r.left + r.width / 2, Math.min(r.top + r.height / 2, H * 0.9));
     textMat.uniforms.uRes.value.set(W, H);
     textMat.uniforms.uC.value.copy(mouth);
     textMat.uniforms.uMouth.value.set(r.width / 2, r.height / 2);
+    postMat.uniforms.uRes.value.set(W, H);
+    postMat.uniforms.uC.value.copy(mouth);
+    postMat.uniforms.uMouth.value.set(r.width / 2, r.height / 2);
 
     // центр горла (начало координат) проецируется ровно в центр синего эллипса
     cam.aspect = W / H;
@@ -362,6 +441,7 @@ async function start() {
   // ================= Прокрутка =================
   const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   let target = 0, prog = 0, dirty = true;
+  let prevProg = 0, wob = 0, wobV = 0, clock = 0;   // пружина от скорости прокрутки
   function readScroll() {
     const max = document.documentElement.scrollHeight - window.innerHeight;
     target = max > 0 ? window.scrollY / max : 0;
@@ -390,7 +470,7 @@ async function start() {
         const s = q / CFG.rimShare;
         y = yTop * Math.pow(1 - s, 1.25);
         R = Rtop + (Rrim * 0.72 - Rtop) * Math.pow(s, 0.85);
-        st = 2.2 * Math.pow(s, 2.2);             // на подлёте к краю начинает тянуть
+        st = 1.0 * Math.pow(s, 2.5);             // на подлёте к краю начинает тянуть
       } else {                                    // внутри: по стенке рупора в глубину
         const s = (q - CFG.rimShare) / (1 - CFG.rimShare);
         const v = Math.pow(s, 1.15) * 0.96;
@@ -398,7 +478,7 @@ async function start() {
         R = Rrim * 0.72 * PROFILE(v);
         fog = Math.min(1, Math.pow(v, 0.7) * 1.1) * open;
         sc = 1 - 0.5 * v;
-        st = 2.2 + 9.0 * Math.pow(s, 1.1);       // внутри — вытягивается в нить
+        st = 1.0 + 5.0 * Math.pow(s, 1.2);       // внутри — вытягивается в нить
       }
       const ang = c.a0 + Math.PI * 2 * CFG.turns * (0.75 * q + 0.25 * q * q * q);
       mesh.position.set(R * Math.sin(ang), y, R * Math.cos(ang));
@@ -412,23 +492,43 @@ async function start() {
       u.uStretch.value = st * open;
       u.uSize.value = s;
       u.uTarget.value.set(0, -D * 1.05, 0);
+      u.uWob.value = wob * (0.7 + 0.6 * Math.sin(c.a0 * 3.0) * 0.5);   // у каждой карточки свой характер
+      u.uTime.value = clock;
     });
+    postMat.uniforms.uWob.value = wob;
+    postMat.uniforms.uOpen.value = open;
 
     document.body.classList.toggle("outro-on", p > 0.9);
   }
 
   let last = performance.now();
   function frame(now) {
-    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000)); last = now;
     const d = target - prog;
-    if (Math.abs(d) > 0.00005 || dirty) {
-      prog += d * (1 - Math.exp(-dt * 6));
-      if (Math.abs(target - prog) < 0.00005) prog = target;
+    prog += d * (1 - Math.exp(-dt * 6));
+    if (Math.abs(target - prog) < 0.00005) prog = target;
+
+    // скорость прокрутки -> пружина: догоняет, перелетает, затухает
+    const vel = (prog - prevProg) / dt; prevProg = prog;
+    const goal = Math.max(-1.2, Math.min(1.2, vel * CFG.velGain));
+    let left = dt;
+    while (left > 0) {
+      const h = Math.min(left, 1 / 120); left -= h;
+      wobV += ((goal - wob) * CFG.stiff - wobV * CFG.damp) * h;
+      wob += wobV * h;
+    }
+    const moving = Math.abs(d) > 0.00005 || Math.abs(wob) > 0.0005 || Math.abs(wobV) > 0.002;
+    if (moving || dirty) {
+      clock += dt;
       update(prog);
+      renderer.setRenderTarget(rt);
       renderer.clear();
       renderer.render(funnelScene, cam);         // яма
       renderer.render(textScene, orthoCam);      // текст поверх, проваливается в горло
       renderer.render(cardScene, cam);           // карточки; пол с дыркой прячет то, что ниже края
+      renderer.setRenderTarget(null);
+      renderer.clear();
+      renderer.render(postScene, orthoCam);      // линза поверх всего кадра
       dirty = false;
     }
     requestAnimationFrame(frame);
@@ -437,7 +537,7 @@ async function start() {
   document.body.classList.add("gl");
   layout();
   readScroll();
-  prog = target;
+  prog = target; prevProg = prog;
   window.addEventListener("scroll", readScroll, { passive: true });
   let rz;
   window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { layout(); readScroll(); }, 120); });
